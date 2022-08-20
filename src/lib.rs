@@ -42,7 +42,7 @@ impl BlockList {
     pub fn push(&mut self, value: usize) {
         let storage = Storage(self.values.len());
         let sum_of_children: usize =
-            storage.children().map(|storage| self.values[storage.storage()]).sum();
+            storage.children().map(|storage| self.values[storage.get()]).sum();
         self.values.push(sum_of_children + value)
     }
 
