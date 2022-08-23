@@ -30,8 +30,18 @@ impl Height {
     }
 
     #[inline(always)]
-    pub fn children(self) -> impl Iterator<Item=Height> {
-        (0..self.get()).rev().map(Height)
+    pub fn parent(self) -> Self {
+        Self(self.get() + 1)
+    }
+
+    #[inline(always)]
+    pub fn parents(self) -> impl Iterator<Item=Self> {
+        iterate(self.parent(), |block| block.parent())
+    }
+
+    #[inline(always)]
+    pub fn children(self) -> impl Iterator<Item=Self> {
+        (0..self.get()).rev().map(Self)
     }
 }
 
@@ -60,29 +70,19 @@ impl Size {
     }
 
     #[inline(always)]
-    pub fn parent(self) -> Size {
-        Size(self.get() << 1)
+    pub fn parent(self) -> Self {
+        Self(self.get() << 1)
     }
 
     #[inline(always)]
-    pub fn parent_bounded(self, len: usize) -> Option<Size> {
-        Some(self.parent()).filter(|it| it.get() <= len)
+    pub fn parents(self) -> impl Iterator<Item=Self> {
+        iterate(self.parent(), |block| block.parent())
     }
 
     #[inline(always)]
-    pub fn parents(self) -> impl Iterator<Item=Size> {
-        iterate(self, |block| block.parent()).skip(1)
-    }
-
-    #[inline(always)]
-    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=Size> {
-        self.parents().take_while(move |block| block.get() <= len)
-    }
-
-    #[inline(always)]
-    pub fn children(self) -> impl Iterator<Item=Size> {
-        iterate(self.get(), |size| size >> 1).skip(1)
-            .take_while(|size| *size > 0).map(Size)
+    pub fn children(self) -> impl Iterator<Item=Self> {
+        iterate(self.get() >> 1, |size| size >> 1)
+            .take_while(|size| *size > 0).map(Self)
     }
 }
 
@@ -96,7 +96,17 @@ impl Start {
     }
 
     #[inline(always)]
-    pub fn children(self) -> impl Iterator<Item=Start> {
+    pub fn parent(self) -> Self {
+        self
+    }
+
+    #[inline(always)]
+    pub fn parents(self) -> impl Iterator<Item=Self> {
+        repeat(self)
+    }
+
+    #[inline(always)]
+    pub fn children(self) -> impl Iterator<Item=Self> {
         repeat(self)
     }
 }
@@ -141,28 +151,28 @@ impl End {
     }
 
     #[inline(always)]
-    pub fn parent(self) -> End {
-        End(self.get() + self.size().get())
+    pub fn parent(self) -> Self {
+        Self(self.get() + self.size().get())
     }
 
     #[inline(always)]
-    pub fn parent_bounded(self, len: usize) -> Option<End> {
+    pub fn parent_bounded(self, len: usize) -> Option<Self> {
         Some(self.parent()).filter(|it| it.get() <= len)
     }
 
     #[inline(always)]
-    pub fn parents(self) -> impl Iterator<Item=End> {
-        iterate(self, |block| block.parent()).skip(1)
+    pub fn parents(self) -> impl Iterator<Item=Self> {
+        iterate(self.parent(), |block| block.parent())
     }
 
     #[inline(always)]
-    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=End> {
+    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=Self> {
         self.parents().take_while(move |block| block.get() <= len)
     }
 
     #[inline(always)]
-    pub fn children(self) -> impl Iterator<Item=End> {
-        self.size().children().map(move |size| End(self.get() - size.get()))
+    pub fn children(self) -> impl Iterator<Item=Self> {
+        self.size().children().map(move |size| Self(self.get() - size.get()))
     }
 }
 
@@ -206,28 +216,28 @@ impl Storage {
     }
 
     #[inline(always)]
-    pub fn parent(self) -> Storage {
-        Storage(self.get() + self.size().get())
+    pub fn parent(self) -> Self {
+        Self(self.get() + self.size().get())
     }
 
     #[inline(always)]
-    pub fn parent_bounded(self, len: usize) -> Option<Storage> {
+    pub fn parent_bounded(self, len: usize) -> Option<Self> {
         Some(self.parent()).filter(|it| it.get() < len)
     }
 
     #[inline(always)]
-    pub fn parents(self) -> impl Iterator<Item=Storage> {
-        iterate(self, |block| block.parent()).skip(1)
+    pub fn parents(self) -> impl Iterator<Item=Self> {
+        iterate(self.parent(), |block| block.parent())
     }
 
     #[inline(always)]
-    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=Storage> {
+    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=Self> {
         self.parents().take_while(move |block| block.get() < len)
     }
 
     #[inline(always)]
-    pub fn children(self) -> impl Iterator<Item=Storage> {
-        self.size().children().map(move |size| Storage(self.get() - size.get()))
+    pub fn children(self) -> impl Iterator<Item=Self> {
+        self.size().children().map(move |size| Self(self.get() - size.get()))
     }
 }
 
@@ -276,29 +286,29 @@ impl StartAndHeight {
     }
 
     #[inline(always)]
-    pub fn parent(self) -> StartAndHeight {
+    pub fn parent(self) -> Self {
         let height = self.height().get() + self.start().get().trailing_ones() as usize;
-        StartAndHeight(Start(self.start().get() >> height << height), Height(height + 1))
+        Self(Start(self.start().get() >> height << height), Height(height + 1))
     }
 
     #[inline(always)]
-    pub fn parent_bounded(self, len: usize) -> Option<StartAndHeight> {
+    pub fn parent_bounded(self, len: usize) -> Option<Self> {
         Some(self.parent()).filter(|it| it.end().get() <= len)
     }
 
     #[inline(always)]
-    pub fn parents(self) -> impl Iterator<Item=StartAndHeight> {
-        iterate(self, |block| block.parent()).skip(1)
+    pub fn parents(self) -> impl Iterator<Item=Self> {
+        iterate(self.parent(), |block| block.parent())
     }
 
     #[inline(always)]
-    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=StartAndHeight> {
+    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=Self> {
         self.parents().take_while(move |block| block.end().get() <= len)
     }
 
     #[inline(always)]
-    pub fn children(self) -> impl Iterator<Item=StartAndHeight> {
-        self.height().children().map(move |height| StartAndHeight(self.start(), height))
+    pub fn children(self) -> impl Iterator<Item=Self> {
+        self.height().children().map(move |height| Self(self.start(), height))
     }
 }
 
@@ -347,28 +357,28 @@ impl StartAndSize {
     }
 
     #[inline(always)]
-    pub fn parent(self) -> StartAndSize {
+    pub fn parent(self) -> Self {
         End(self.end().get() + self.size().get()).start_and_size()
     }
 
     #[inline(always)]
-    pub fn parent_bounded(self, len: usize) -> Option<StartAndSize> {
+    pub fn parent_bounded(self, len: usize) -> Option<Self> {
         Some(self.parent()).filter(|it| it.end().get() <= len)
     }
 
     #[inline(always)]
-    pub fn parents(self) -> impl Iterator<Item=StartAndSize> {
-        iterate(self, |block| block.parent()).skip(1)
+    pub fn parents(self) -> impl Iterator<Item=Self> {
+        iterate(self.parent(), |block| block.parent())
     }
 
     #[inline(always)]
-    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=StartAndSize> {
+    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=Self> {
         self.parents().take_while(move |block| block.end().get() <= len)
     }
 
     #[inline(always)]
-    pub fn children(self) -> impl Iterator<Item=StartAndSize> {
-        self.size().children().map(move |size| StartAndSize(self.0, size))
+    pub fn children(self) -> impl Iterator<Item=Self> {
+        self.size().children().map(move |size| Self(self.0, size))
     }
 }
 
@@ -417,28 +427,28 @@ impl HeightAtZero {
     }
 
     #[inline(always)]
-    pub fn parent(self) -> HeightAtZero {
+    pub fn parent(self) -> Self {
         self.height().parent().height_at_zero()
     }
 
     #[inline(always)]
-    pub fn parent_bounded(self, len: usize) -> Option<HeightAtZero> {
+    pub fn parent_bounded(self, len: usize) -> Option<Self> {
         Some(self.parent()).filter(|it| it.end().get() <= len)
     }
 
     #[inline(always)]
-    pub fn parents(self) -> impl Iterator<Item=HeightAtZero> {
-        iterate(self, |block| block.parent()).skip(1)
+    pub fn parents(self) -> impl Iterator<Item=Self> {
+        iterate(self.parent(), |block| block.parent())
     }
 
     #[inline(always)]
-    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=HeightAtZero> {
+    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=Self> {
         self.parents().take_while(move |block| block.end().get() <= len)
     }
 
     #[inline(always)]
-    pub fn children(self) -> impl Iterator<Item=HeightAtZero> {
-        self.height().children().map(move |height| HeightAtZero(self.start(), height))
+    pub fn children(self) -> impl Iterator<Item=Self> {
+        self.height().children().map(Height::height_at_zero)
     }
 }
 
@@ -487,27 +497,27 @@ impl SizeAtZero {
     }
 
     #[inline(always)]
-    pub fn parent(self) -> SizeAtZero {
-        SizeAtZero(self.size().parent())
+    pub fn parent(self) -> Self {
+        Self(self.size().parent())
     }
 
     #[inline(always)]
-    pub fn parent_bounded(self, len: usize) -> Option<SizeAtZero> {
+    pub fn parent_bounded(self, len: usize) -> Option<Self> {
         Some(self.parent()).filter(|it| it.end().get() <= len)
     }
 
     #[inline(always)]
-    pub fn parents(self) -> impl Iterator<Item=SizeAtZero> {
+    pub fn parents(self) -> impl Iterator<Item=Self> {
         iterate(self, |block| block.parent()).skip(1)
     }
 
     #[inline(always)]
-    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=SizeAtZero> {
+    pub fn parents_bounded(self, len: usize) -> impl Iterator<Item=Self> {
         self.parents().take_while(move |block| block.end().get() <= len)
     }
 
     #[inline(always)]
-    pub fn children(self) -> impl Iterator<Item=SizeAtZero> {
-        self.size().children().map(move |size| SizeAtZero(self.0, size))
+    pub fn children(self) -> impl Iterator<Item=Self> {
+        self.size().children().map(Size::size_at_zero)
     }
 }
