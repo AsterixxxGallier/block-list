@@ -2,6 +2,7 @@
 "This module is designed to be complete in its functionality, even though parts are not used.")]
 
 use std::iter::repeat;
+use std::mem::replace;
 use std::num::NonZeroUsize;
 use itertools::iterate;
 
@@ -43,6 +44,11 @@ impl Height {
     pub fn children(self) -> impl Iterator<Item=Self> {
         (0..self.get()).rev().map(Self)
     }
+
+    #[inline(always)]
+    pub fn small_siblings(self) -> impl Iterator<Item=Self> {
+        self.children()
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -83,6 +89,11 @@ impl Size {
     pub fn children(self) -> impl Iterator<Item=Self> {
         iterate(self.get() >> 1, |size| size >> 1)
             .take_while(|size| *size > 0).map(Self)
+    }
+
+    #[inline(always)]
+    pub fn small_siblings(self) -> impl Iterator<Item=Self> {
+        self.children()
     }
 }
 
@@ -174,6 +185,11 @@ impl End {
     pub fn children(self) -> impl Iterator<Item=Self> {
         self.size().children().map(move |size| Self(self.get() - size.get()))
     }
+
+    #[inline(always)]
+    pub fn small_siblings(self) -> impl Iterator<Item=Self> {
+        self.size().children().map(move |size| Self(self.get() + size.get()))
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -238,6 +254,11 @@ impl Storage {
     #[inline(always)]
     pub fn children(self) -> impl Iterator<Item=Self> {
         self.size().children().map(move |size| Self(self.get() - size.get()))
+    }
+
+    #[inline(always)]
+    pub fn small_siblings(self) -> impl Iterator<Item=Self> {
+        self.size().children().map(move |size| Self(self.get() + size.get()))
     }
 }
 
@@ -310,6 +331,15 @@ impl StartAndHeight {
     pub fn children(self) -> impl Iterator<Item=Self> {
         self.height().children().map(move |height| Self(self.start(), height))
     }
+
+    #[inline(always)]
+    pub fn small_siblings(self) -> impl Iterator<Item=Self> {
+        let mut start = Start(self.start().get() + self.height().size().get());
+        self.height().children().map(move |height| {
+            let next_start = Start(start.get() + height.size().get());
+            Self(replace(&mut start, next_start), height)
+        })
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -378,7 +408,16 @@ impl StartAndSize {
 
     #[inline(always)]
     pub fn children(self) -> impl Iterator<Item=Self> {
-        self.size().children().map(move |size| Self(self.0, size))
+        self.size().children().map(move |size| Self(self.start(), size))
+    }
+
+    #[inline(always)]
+    pub fn small_siblings(self) -> impl Iterator<Item=Self> {
+        let mut start = Start(self.start().get() + self.size().get());
+        self.size().children().map(move |size| {
+            let next_start = Start(start.get() + size.get());
+            Self(replace(&mut start, next_start), size)
+        })
     }
 }
 
@@ -450,6 +489,11 @@ impl HeightAtZero {
     pub fn children(self) -> impl Iterator<Item=Self> {
         self.height().children().map(Height::height_at_zero)
     }
+
+    #[inline(always)]
+    pub fn small_siblings(self) -> impl Iterator<Item=Self> {
+        self.height().small_siblings().map(Height::height_at_zero)
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -519,5 +563,10 @@ impl SizeAtZero {
     #[inline(always)]
     pub fn children(self) -> impl Iterator<Item=Self> {
         self.size().children().map(Size::size_at_zero)
+    }
+
+    #[inline(always)]
+    pub fn small_siblings(self) -> impl Iterator<Item=Self> {
+        self.size().small_siblings().map(Size::size_at_zero)
     }
 }
