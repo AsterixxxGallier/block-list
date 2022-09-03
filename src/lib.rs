@@ -1,6 +1,7 @@
 #![feature(lint_reasons)]
 
-use crate::block::Storage;
+use std::ops::{Index, IndexMut};
+use crate::block::{Height, HeightAtZero, Storage};
 
 /// A `BlockList` consists of blocks.
 ///
@@ -29,9 +30,19 @@ use crate::block::Storage;
 /// ```
 // BlockList is of elements where + and - are defined such that A + B - B = A
 // PartialBlockList is of elements where only + is defined
-#[derive(Default)]
+// TODO: think about BlockList variant where negative values are allowed
 pub struct BlockList {
-    values: Vec<usize>
+    values: Vec<usize>,
+    highest_block: HeightAtZero
+}
+
+impl Default for BlockList {
+    fn default() -> Self {
+        Self {
+            values: vec![],
+            highest_block: HeightAtZero(Height(0))
+        }
+    }
 }
 
 impl BlockList {
@@ -43,7 +54,10 @@ impl BlockList {
         let storage = Storage(self.values.len());
         let sum_of_children: usize =
             storage.children().map(|storage| self.values[storage.get()]).sum();
-        self.values.push(sum_of_children + value)
+        self.values.push(sum_of_children + value);
+        if self.values.len().is_power_of_two() {
+            self.highest_block = self.highest_block.parent();
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -54,8 +68,27 @@ impl BlockList {
         self.len() == 0
     }
 
-    pub fn total(&self) -> usize {
+    // FIXME panics when not all small siblings are in bounds
+    pub fn sum(&self) -> usize {
+        self[self.highest_block.storage()] +
+            self.highest_block
+                .small_siblings()
+                .map(|block| self[block.storage()])
+                .sum::<usize>()
+    }
+}
 
+impl Index<Storage> for BlockList {
+    type Output = usize;
+
+    fn index(&self, index: Storage) -> &Self::Output {
+        &self.values[index.get()]
+    }
+}
+
+impl IndexMut<Storage> for BlockList {
+    fn index_mut(&mut self, index: Storage) -> &mut Self::Output {
+        &mut self.values[index.get()]
     }
 }
 
